@@ -1,6 +1,7 @@
 import av
 import yt_dlp
 import os
+import time
 
 class YouTubeToMP3:
     def __init__(self):
@@ -11,7 +12,7 @@ class YouTubeToMP3:
         try:
             download_folder = os.getcwd()
             ydl_opts = {
-                'format': 'bestaudio[ext=webm]',
+                'format': 'bestaudio[ext=webm]/bestaudio',
                 'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -20,38 +21,37 @@ class YouTubeToMP3:
 
             # Find the newly downloaded file
             files = os.listdir(download_folder)
-            print(f"Files in directory: {files}")
             downloaded_file = max(files, key=lambda x: os.path.getctime(os.path.join(download_folder, x)))
-            print(f"Downloaded file: {downloaded_file}")
 
-            # Convert WebM to MP3
+            # Convert WebM to high-quality MP3
             webm_file = os.path.join(download_folder, downloaded_file)
             mp3_file = os.path.join(download_folder, downloaded_file.replace('.webm', '.mp3'))
-            input_container = av.open(webm_file)
-            output_container = av.open(mp3_file, mode='w')
-            stream = input_container.streams.audio[0]
-            ostream = output_container.add_stream("mp3", rate=44100)
+            with av.open(webm_file) as input_container:
+                stream = input_container.streams.audio[0]
+                
+                with av.open(mp3_file, mode='w') as output_container:
+                    ostream = output_container.add_stream("mp3", rate=44100)
+                    for packet in input_container.demux(stream):
+                        for frame in packet.decode():
+                            new_packets = ostream.encode(frame)
+                            if new_packets:
+                                output_container.mux(new_packets)
+                    # Flush the encoder
+                    try:
+                        new_packets = ostream.encode(None)
+                        while new_packets:
+                            output_container.mux(new_packets)
+                            new_packets = ostream.encode(None)
+                    except Exception as e:
+                        if "End of file" in str(e):
+                            print("Conversion completed successfully.")
+                        else:
+                            print(f"Error: {str(e)}")
+            print(f"Conversion successful! High-quality MP3 file saved as: {mp3_file}")
 
-            for packet in input_container.demux(stream):
-                for frame in packet.decode():
-                    new_packets = ostream.encode(frame)
-                    if new_packets:
-                        output_container.mux(new_packets)
-
-            # Flush the encoder
-            try:
-                new_packets = ostream.encode(None)
-                while new_packets:
-                    output_container.mux(new_packets)
-                    new_packets = ostream.encode(None)
-            except Exception as e:
-                if "End of file" in str(e):
-                    print("Conversion completed successfully.")
-                else:
-                    print(f"Error: {str(e)}")
-
-            output_container.close()
-            print(f"Conversion successful! MP3 file saved as: {mp3_file}")
+            # Delete WebM file
+            time.sleep(1)  # Wait for 1 second
+            os.remove(webm_file)
 
         except Exception as e:
             print(f"Error: {str(e)}")
