@@ -17,6 +17,7 @@ git clone https://github.com/Nuclearstar/YouTube-Downloader.git
 - Then change directory to this project
 `
 cd YouTube Downloader
+`
 - Then setup a virtual env
 `
 python -m venv myenv
