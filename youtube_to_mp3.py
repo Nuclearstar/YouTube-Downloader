@@ -1,7 +1,10 @@
 import av
-import yt_dlp
+import eyed3
 import os
+import re
+import requests
 import time
+import yt_dlp
 
 class YouTubeToMP3:
     def __init__(self):
@@ -16,16 +19,27 @@ class YouTubeToMP3:
                 'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-            print(f"Download successful!")
+                info = ydl.extract_info(url, download=True)
+                title = info['title']
+                # Replace invalid characters with underscores
+                title = re.sub(r'[<>:"/\\|?* ]+', '_', title)
+                thumbnail_url = info['thumbnails'][-1]['url']
+                # Download thumbnail
+                response = requests.get(thumbnail_url)
+                thumbnail_file = os.path.join(download_folder, f"{title}.jpg")
+                with open(thumbnail_file, 'wb') as file:
+                    file.write(response.content)
+                print(f"Download successful!")
 
             # Find the newly downloaded file
             files = os.listdir(download_folder)
-            downloaded_file = max(files, key=lambda x: os.path.getctime(os.path.join(download_folder, x)))
+            webm_files = [file for file in files if file.endswith('.webm')]
+            downloaded_file = max(webm_files, key=lambda x: os.path.getctime(os.path.join(download_folder, x)))
 
             # Convert WebM to high-quality MP3
             webm_file = os.path.join(download_folder, downloaded_file)
             mp3_file = os.path.join(download_folder, downloaded_file.replace('.webm', '.mp3'))
+
             with av.open(webm_file) as input_container:
                 stream = input_container.streams.audio[0]
                 
@@ -49,9 +63,19 @@ class YouTubeToMP3:
                             print(f"Error: {str(e)}")
             print(f"Conversion successful! High-quality MP3 file saved as: {mp3_file}")
 
-            # Delete WebM file
+            # Embed thumbnail in MP3 file            
+            audio_file = eyed3.load(mp3_file)
+            if audio_file.tag is None:
+                 audio_file.initTag()                 
+
+            with open(thumbnail_file, "rb") as image_file:
+                 audio_file.tag.images.set(3, image_file.read(), "image/jpeg")
+            audio_file.tag.save()
+
+            # Delete both WebM & thumbnail files
             time.sleep(1)  # Wait for 1 second
             os.remove(webm_file)
+            os.remove(thumbnail_file)
 
         except Exception as e:
             print(f"Error: {str(e)}")

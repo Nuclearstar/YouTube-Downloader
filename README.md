@@ -5,8 +5,9 @@ This script helps you to convert any youtube music of your choice into a downloa
 ## Installation Dependencies:
 
 - Python 3 (3.12.7)
-- yt-dlp
 - av
+- eyed3
+- yt-dlp
 
 ## How to run?
 

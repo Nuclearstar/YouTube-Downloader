@@ -1,2 +1,3 @@
-yt-dlp
 av
+eyed3
+yt-dlp
